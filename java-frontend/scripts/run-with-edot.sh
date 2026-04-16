@@ -21,10 +21,39 @@ fi
 
 if [ ! -f "$AGENT" ]; then
     echo "EDOT Java agent not found. Downloading..."
-    echo "  Source: https://github.com/elastic/elastic-otel-java/releases/latest"
-    curl -L -o "$AGENT" \
-        "https://github.com/elastic/elastic-otel-java/releases/latest/download/elastic-otel-javaagent.jar"
-    echo "  ✓ Downloaded $AGENT"
+
+    # Resolve the latest version from the GitHub API.
+    # The release asset is named elastic-otel-javaagent-{VERSION}.jar — there is
+    # no unversioned filename, so we must look up the version first.
+    EDOT_VERSION=$(curl -sf https://api.github.com/repos/elastic/elastic-otel-java/releases/latest \
+        | grep '"tag_name"' \
+        | sed 's/.*"tag_name": *"v\([^"]*\)".*/\1/')
+
+    if [ -z "$EDOT_VERSION" ]; then
+        echo ""
+        echo "ERROR: Could not resolve the latest EDOT Java version from the GitHub API."
+        echo "  Check your network connection, or download manually:"
+        echo "  https://github.com/elastic/elastic-otel-java/releases/latest"
+        echo "  Place the jar in this directory and rename it to: $AGENT"
+        exit 1
+    fi
+
+    # Download from Maven Central — more stable than GitHub release asset URLs.
+    DOWNLOAD_URL="https://repo1.maven.org/maven2/co/elastic/otel/elastic-otel-javaagent/${EDOT_VERSION}/elastic-otel-javaagent-${EDOT_VERSION}.jar"
+
+    echo "  Version : $EDOT_VERSION"
+    echo "  Source  : $DOWNLOAD_URL"
+
+    curl -Lf -o "$AGENT" "$DOWNLOAD_URL" || {
+        echo ""
+        echo "ERROR: Download failed. Please download manually:"
+        echo "  $DOWNLOAD_URL"
+        echo "  Place the jar here and rename it to: $AGENT"
+        rm -f "$AGENT"
+        exit 1
+    }
+
+    echo "  ✓ Downloaded $AGENT (v${EDOT_VERSION})"
 fi
 
 if [ -z "$OTEL_EXPORTER_OTLP_ENDPOINT" ]; then
