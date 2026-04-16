@@ -17,6 +17,13 @@
 
 set -e
 
+# Prevent apt-get and needrestart from prompting for service restarts or
+# debconf questions during package installation — without this the script
+# hangs waiting for user input on a "Restart services?" dialog.
+export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=a        # auto-restart services without asking
+export NEEDRESTART_SUSPEND=1     # suppress the needrestart banner entirely
+
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; RED='\033[0;31m'; BOLD='\033[1m'; NC='\033[0m'
@@ -60,7 +67,9 @@ install_if_missing() {
     fi
 }
 
-sudo apt-get update -qq
+sudo apt-get update -qq \
+    -o Dpkg::Options::="--force-confdef" \
+    -o Dpkg::Options::="--force-confold"
 
 install_if_missing java    openjdk-17-jdk          "Java 17"
 install_if_missing mvn     maven                   "Maven"
@@ -90,6 +99,10 @@ if ! sudo systemctl is-active --quiet postgresql 2>/dev/null; then
     sudo systemctl start postgresql
 fi
 info "PostgreSQL is running"
+
+# All psql commands run from /tmp so the postgres system user (which cannot
+# access /root or other restricted home directories) has a readable working dir.
+pushd /tmp > /dev/null
 
 # Create user
 if sudo -u postgres psql -tAc "SELECT 1 FROM pg_roles WHERE rolname='$DB_USER';" | grep -q 1; then
@@ -139,6 +152,8 @@ SQL
 
 ROW_COUNT=$(sudo -u postgres psql -d "$DB_NAME" -tAc "SELECT COUNT(*) FROM users;")
 info "Schema ready — $ROW_COUNT rows in users table"
+
+popd > /dev/null
 
 # ── 4. Python virtual environment ───────────────────────────────────────────
 section "Setting up Python environment"
