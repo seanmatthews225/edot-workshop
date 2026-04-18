@@ -42,8 +42,6 @@ kubectl get service apm-lb
 
 Copy the value from the `EXTERNAL-IP` column.
 
----
-
 Now open `.env.otel` and fill in both values:
 
 ```bash
