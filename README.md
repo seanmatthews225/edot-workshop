@@ -18,41 +18,63 @@ Browser → Java Frontend (8080) → Python Backend (8000) → PostgreSQL
 
 ---
 
-## Before you start
-
-You'll need the **APM Server host and secret token** for your Elastic 8.x deployment. Find the secret token in `apm-server.yml` under `apm-server.auth.secret_token`, or in Kibana under Fleet → Agent policies → your policy → APM integration.
-
-Everything else (Java, Maven, Python, PostgreSQL) is installed automatically by the bootstrap script.
-
-> **Elastic Stack version note:** EDOT SDKs are officially supported on Elastic Stack 8.18+. If your deployment is running 8.17, the core workshop experience — distributed traces, service map, span waterfalls across Java, Python, and PostgreSQL — works fine because it uses the standard OTLP protocol, which APM Server has supported since 7.x. A small number of EDOT-specific UI enhancements require 8.18+, but none of them affect the workshop goals.
-
----
-
 ## Step 0 — Bootstrap (run once)
 
 Installs all dependencies, builds the app, sets up the database, and downloads the EDOT agents:
 
 ```bash
+git clone https://github.com/seanmatthews225/edot-workshop.git
+cd edot-workshop
 ./bootstrap.sh
 ```
 
-When it finishes, open `.env.otel` and fill in your APM Server details:
+When it finishes, get your APM secret token from your lab credentials file:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT="http://<apm-server-host>:8200"
+cat ~/env.yaml
+```
+
+You'll also need the external IP of your APM Server. Run:
+
+```bash
+kubectl get service apm-lb
+```
+
+Copy the value from the `EXTERNAL-IP` column.
+
+---
+
+Now open `.env.otel` and fill in both values:
+
+```bash
+nano .env.otel
+```
+
+```bash
+OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
 OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 ```
 
 ---
 
-## Step 1 — Run the app (no instrumentation)
+## Step 1 — Run the app with no instrumentation
+
+Start both services in the background:
 
 ```bash
 ./scripts/start.sh
 ```
 
-Open **http://localhost:8080**. Add and delete users. Everything works — but nothing is being observed. No services will appear in Elastic yet.
+Open a public tunnel to access the app from your browser:
+
+```bash
+./scripts/tunnel.sh
+```
+
+The tunnel will print a **password** (the VM's public IP) and a public URL. Open the URL and enter the password when prompted. Add and delete users — everything works, but nothing is being observed. No services appear in Elastic yet.
+
+Press `Ctrl+C` to close the tunnel, then stop the services:
 
 ```bash
 ./scripts/stop.sh
@@ -60,15 +82,56 @@ Open **http://localhost:8080**. Add and delete users. Everything works — but n
 
 ---
 
-## Step 2 — Instrument Java
+## Step 2 — Instrument Java manually
+
+Before using the scripts, let's see exactly what zero-code Java instrumentation looks like. This step runs the Java app by hand so you can see the EDOT agent command.
+
+Export the OTEL environment variables (replace the placeholders with your values from Step 0):
+
+```bash
+export OTEL_SERVICE_NAME=java-frontend
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=workshop"
+```
+
+Start Java with the EDOT agent attached — the only difference from a normal Java startup is the `-javaagent` flag:
+
+```bash
+cd java-frontend
+java -javaagent:elastic-otel-javaagent.jar -jar target/java-frontend-1.0.0.jar
+```
+
+Watch the startup output. You'll see the EDOT agent initialise before the Spring Boot banner — that's the agent attaching to the JVM and setting up instrumentation automatically. No code was changed.
+
+Press `Ctrl+C` to stop Java, then return to the repo root:
+
+```bash
+cd ..
+```
+
+---
+
+## Step 3 — Run Java instrumented via script + view in Elastic
+
+Now run the same thing using the helper script, which starts both services in the background and reads credentials from `.env.otel`:
 
 ```bash
 ./scripts/start-java-edot.sh
 ```
 
-Generate some traffic in the browser, then open **Elastic → Observability → Service Map**.
+Open the tunnel to generate traffic:
 
-You'll see `java-frontend` appear. Click into a trace — you can see every HTTP request the Java service handled. But the calls it makes to Python show up as anonymous external spans. **Python is still a black box.**
+```bash
+./scripts/tunnel.sh
+```
+
+Click around in the app, then open **Elastic → Observability → Service Map** in Kibana.
+
+You'll see `java-frontend` appear. Click into a trace — every HTTP request the Java service handled is visible. But the calls it makes to Python show up as anonymous external spans. **Python is still a black box.**
+
+Press `Ctrl+C` to close the tunnel, then stop all services:
 
 ```bash
 ./scripts/stop.sh
@@ -76,15 +139,55 @@ You'll see `java-frontend` appear. Click into a trace — you can see every HTTP
 
 ---
 
-## Step 3 — Instrument Python (complete the picture)
+## Step 4 — Instrument Python manually
+
+Now let's do the same for Python. Export the OTEL environment variables:
+
+```bash
+export OTEL_SERVICE_NAME=python-backend
+export OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
+export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
+export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
+export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL="http/protobuf"
+export OTEL_METRICS_EXPORTER=none
+export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=workshop"
+```
+
+Start Python with the OpenTelemetry wrapper — again, no code changes, just a different launch command:
+
+```bash
+cd python-backend
+opentelemetry-instrument venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+```
+
+Watch the startup output. You'll see the OpenTelemetry SDK initialise alongside Uvicorn — FastAPI, SQLAlchemy, and the database driver are all instrumented automatically via import hooks.
+
+Press `Ctrl+C` to stop Python, then return to the repo root:
+
+```bash
+cd ..
+```
+
+---
+
+## Step 5 — Run everything with scripts (full instrumentation)
+
+You've now seen how to instrument both services manually. Step 5 runs both together cleanly in the background:
 
 ```bash
 ./scripts/start-full-edot.sh
 ```
 
-Generate traffic again and go back to the Service Map.
+Open the tunnel:
 
-Now both `java-frontend` and `python-backend` appear. Click into any trace and you'll see the full chain: **Java → Python → PostgreSQL**, with SQL queries visible as child spans — all sharing the same trace ID, all with zero changes to the application code.
+```bash
+./scripts/tunnel.sh
+```
+
+Generate traffic and go back to the Service Map. Click into any trace and you'll see the complete picture: **Java → Python → PostgreSQL**, with SQL queries visible as child spans — all sharing the same trace ID, with zero changes to application code.
+
+Press `Ctrl+C` to close the tunnel, then stop all services:
 
 ```bash
 ./scripts/stop.sh
@@ -93,8 +196,6 @@ Now both `java-frontend` and `python-backend` appear. Click into any trace and y
 ---
 
 ## Watching logs
-
-All output is written to the `logs/` directory while services run in the background:
 
 ```bash
 tail -f logs/*.log       # both services
@@ -117,9 +218,9 @@ kill -9 <PID>
 sudo systemctl start postgresql
 ```
 
-**401 from the OTLP endpoint** — your API key is wrong or lacks APM permissions. Regenerate it in Kibana with Editor privileges.
+**401 from the OTLP endpoint** — your secret token is wrong or missing. Double-check the value in `.env.otel` against `~/env.yaml`.
 
-**No traces appearing** — wait 30–60 seconds after generating traffic, then check `tail -f logs/java.log` for connection errors and verify your `.env.otel` values are correct.
+**No traces appearing** — wait 30–60 seconds after generating traffic. Check `tail -f logs/java.log` for connection errors and verify your endpoint and token are correct.
 
 ---
 
