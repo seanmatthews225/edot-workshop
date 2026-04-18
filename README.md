@@ -55,7 +55,6 @@ OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
 OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
 OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 ```
-
 ---
 
 ## Step 1 — Run the app with no instrumentation
@@ -90,9 +89,9 @@ Export the OTEL environment variables (replace the placeholders with your values
 
 ```bash
 export OTEL_SERVICE_NAME=java-frontend
+export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
 export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
-export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_RESOURCE_ATTRIBUTES="deployment.environment=workshop"
 ```
 
@@ -145,8 +144,6 @@ Now let's do the same for Python. Export the OTEL environment variables:
 
 ```bash
 export OTEL_SERVICE_NAME=python-backend
-export OTEL_EXPORTER_OTLP_ENDPOINT="http://<EXTERNAL-IP>:8200"
-export OTEL_EXPORTER_OTLP_HEADERS="Authorization=Bearer <your-secret-token>"
 export OTEL_EXPORTER_OTLP_PROTOCOL="http/protobuf"
 export OTEL_EXPORTER_OTLP_TRACES_PROTOCOL="http/protobuf"
 export OTEL_EXPORTER_OTLP_LOGS_PROTOCOL="http/protobuf"
