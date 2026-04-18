@@ -176,10 +176,15 @@ venv/bin/pip install -q --upgrade pip
 venv/bin/pip install -q -r requirements.txt
 info "App dependencies installed"
 
-# Pre-install EDOT Python so it's ready for the instrumentation steps
-venv/bin/pip install -q elastic-opentelemetry
-venv/bin/edot-bootstrap --action=install
-info "EDOT Python (elastic-opentelemetry) installed and bootstrapped"
+# Install OpenTelemetry Python auto-instrumentation libraries.
+# We use opentelemetry-distro (standard OTel) rather than elastic-opentelemetry
+# (EDOT Python) because EDOT Python is officially supported on Elastic Stack
+# 8.18+ and returns 500s from APM Server on 8.17. The standard distro uses the
+# same OTLP protocol and zero-code opentelemetry-instrument wrapper, so the
+# workshop experience is identical.
+venv/bin/pip install -q opentelemetry-distro opentelemetry-exporter-otlp-proto-http
+venv/bin/opentelemetry-bootstrap --action=install
+info "OpenTelemetry Python installed and bootstrapped"
 
 # ── 5. Build Java ───────────────────────────────────────────────────────────
 section "Building Java frontend"
