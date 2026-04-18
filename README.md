@@ -155,7 +155,7 @@ Start Python with the OpenTelemetry wrapper — again, no code changes, just a d
 
 ```bash
 cd python-backend
-opentelemetry-instrument venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
+venv/bin/opentelemetry-instrument venv/bin/uvicorn main:app --host 0.0.0.0 --port 8000
 ```
 
 Watch the startup output. You'll see the OpenTelemetry SDK initialise alongside Uvicorn — FastAPI, SQLAlchemy, and the database driver are all instrumented automatically via import hooks.
