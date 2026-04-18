@@ -28,6 +28,8 @@ cd edot-workshop
 ./bootstrap.sh
 ```
 
+* The `bootstrap.sh` should take approximately 3 Minutes and 45 Seconds to complete (On a good day ;) ) 
+
 When it finishes, get your APM secret token from your lab credentials file:
 
 ```bash
