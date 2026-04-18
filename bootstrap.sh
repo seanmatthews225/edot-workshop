@@ -17,12 +17,13 @@
 
 set -e
 
-# Prevent apt-get and needrestart from prompting for service restarts or
-# debconf questions during package installation — without this the script
-# hangs waiting for user input on a "Restart services?" dialog.
+# Prevent apt-get and needrestart from prompting during package installation.
+# NEEDRESTART_SUSPEND=1 suppresses the "Restart services?" dialog entirely
+# WITHOUT actually restarting anything — safe for shared environments where
+# other services (e.g. Kubernetes components) must not be touched.
+# NEEDRESTART_MODE is intentionally NOT set to avoid auto-restarting services.
 export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=a        # auto-restart services without asking
-export NEEDRESTART_SUSPEND=1     # suppress the needrestart banner entirely
+export NEEDRESTART_SUSPEND=1
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -85,6 +86,13 @@ else
     info "PostgreSQL installed"
 fi
 install_if_missing curl    curl                    "curl"
+if command -v node &>/dev/null; then
+    info "Node.js already installed"
+else
+    echo -e "  ${YELLOW}→${NC}  Installing Node.js (required for localtunnel)..."
+    sudo apt-get install -y -q nodejs npm > /dev/null
+    info "Node.js installed"
+fi
 
 # ── 3. PostgreSQL setup ─────────────────────────────────────────────────────
 section "Setting up PostgreSQL"
