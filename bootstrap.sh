@@ -17,15 +17,7 @@
 
 set -e
 
-# Prevent apt-get and needrestart from prompting during package installation.
-# NEEDRESTART_MODE=l  → "list" mode: needrestart scans and prints what would
-#   need restarting but takes NO action and shows NO interactive prompt.
-#   Safe for shared environments (e.g. ECK nodes) — running services such as
-#   containerd and kubelet are never touched.
-# NEEDRESTART_SUSPEND=1 additionally suppresses the needrestart banner line.
 export DEBIAN_FRONTEND=noninteractive
-export NEEDRESTART_MODE=l
-export NEEDRESTART_SUSPEND=1
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -69,6 +61,11 @@ install_if_missing() {
         info "$label installed"
     fi
 }
+
+# Remove needrestart so it can't prompt or restart services during installs.
+# It's a post-install hook and environment variables don't reliably suppress it.
+# Safe to remove — it's a convenience tool only and is not needed on this VM.
+sudo apt-get remove -y needrestart 2>/dev/null || true
 
 sudo apt-get update -qq \
     -o Dpkg::Options::="--force-confdef" \
