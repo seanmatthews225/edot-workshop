@@ -3,7 +3,7 @@
 # EDOT Workshop — Stop all services
 # =============================================================================
 
-REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
+REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 
 stopped=0
