@@ -18,11 +18,13 @@
 set -e
 
 # Prevent apt-get and needrestart from prompting during package installation.
-# NEEDRESTART_SUSPEND=1 suppresses the "Restart services?" dialog entirely
-# WITHOUT actually restarting anything — safe for shared environments where
-# other services (e.g. Kubernetes components) must not be touched.
-# NEEDRESTART_MODE is intentionally NOT set to avoid auto-restarting services.
+# NEEDRESTART_MODE=l  → "list" mode: needrestart scans and prints what would
+#   need restarting but takes NO action and shows NO interactive prompt.
+#   Safe for shared environments (e.g. ECK nodes) — running services such as
+#   containerd and kubelet are never touched.
+# NEEDRESTART_SUSPEND=1 additionally suppresses the needrestart banner line.
 export DEBIAN_FRONTEND=noninteractive
+export NEEDRESTART_MODE=l
 export NEEDRESTART_SUSPEND=1
 
 REPO_DIR="$(cd "$(dirname "$0")" && pwd)"
