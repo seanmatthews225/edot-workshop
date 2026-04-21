@@ -104,6 +104,9 @@ java -javaagent:elastic-otel-javaagent.jar -jar target/java-frontend-1.0.0.jar
 
 Watch the startup output. You'll see the EDOT agent initialise before the Spring Boot banner — that's the agent attaching to the JVM and setting up instrumentation automatically. No code was changed.
 
+Check in the Kibana UI -> Service Inventory, you should see the `java-frontend` appear in the UI:
+<img width="1422" height="885" alt="Screenshot 2026-04-21 at 4 05 28 PM" src="https://github.com/user-attachments/assets/4af2cdb1-0723-4f13-be7c-f48de0275e0b" />
+
 Press `Ctrl+C` to stop Java, then return to the repo root:
 
 ```bash
@@ -126,9 +129,20 @@ Open the tunnel to generate traffic:
 ./scripts/tunnel.sh
 ```
 
-Click around in the app, then open **Elastic → Observability → Service Map** in Kibana.
+In the application UI, go ahead and add a user that already exists, the UI shall just refresh.
+- Did the user get added? Who knows?
 
-You'll see `java-frontend` appear. Click into a trace — every HTTP request the Java service handled is visible. But the calls it makes to Python show up as anonymous external spans. **Python is still a black box.**
+Navigate into Kibana, then open **Elastic → Observability → Service Inventory** in Kibana.
+
+You'll see `java-frontend` appear. Click into the `java-frontend`:
+1. Take a look at the `Service Map` in the `java-frontend`, does the `python-backend` show up? If not, why is that?
+3. Take a look into the `Transactions` for the `POST /users` endpoint
+4. Your latest trace should show at the bottom of the UI, displaying a `failure`, why is this?
+- Leverage the `Investigate` to view the `Trace Logs` to see why
+
+Expected Output:
+<img width="2245" height="401" alt="Screenshot 2026-04-21 at 4 28 55 PM" src="https://github.com/user-attachments/assets/66148d19-21ee-4723-ac6b-091d3ab102b7" />
+<img width="2273" height="1003" alt="Screenshot 2026-04-21 at 4 20 49 PM" src="https://github.com/user-attachments/assets/a9f4bfbc-62da-46cd-81b7-bcaf6c32b962" />
 
 Press `Ctrl+C` to close the tunnel, then stop all services:
 
@@ -160,6 +174,8 @@ venv/bin/opentelemetry-instrument venv/bin/uvicorn main:app --host 0.0.0.0 --por
 
 Watch the startup output. You'll see the OpenTelemetry SDK initialise alongside Uvicorn — FastAPI, SQLAlchemy, and the database driver are all instrumented automatically via import hooks.
 
+The `python-backend` shall now show up in the **Service Inventory** within Kibana, however, the `java-frontend` shall stop reporting telemetry as the service is stopped, we should start both service up!
+
 Press `Ctrl+C` to stop Python, then return to the repo root:
 
 ```bash
@@ -183,6 +199,12 @@ Open the tunnel:
 ```
 
 Generate traffic and go back to the Service Map. Click into any trace and you'll see the complete picture: **Java → Python → PostgreSQL**, with SQL queries visible as child spans — all sharing the same trace ID, with zero changes to application code.
+<img width="2258" height="1030" alt="Screenshot 2026-04-21 at 4 28 34 PM" src="https://github.com/user-attachments/assets/82bd4144-6dcb-40fd-a944-af1d40242651" />
+
+
+Lets add the same user we tried to add earlier, how different do the Trace and Service Map look now?
+- Take a look into the `Transactions` for the `POST /users` endpoint
+<img width="2242" height="830" alt="Screenshot 2026-04-21 at 4 28 23 PM" src="https://github.com/user-attachments/assets/95485366-6f60-4d4c-a454-3a4d7a07b9a3" />
 
 Press `Ctrl+C` to close the tunnel, then stop all services:
 
